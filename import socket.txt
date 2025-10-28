@@ -1,0 +1,62 @@
+import socket
+import threading
+import random
+import time
+
+HOST = '0.0.0.0'  # acepta conexiones externas
+PORT = 5000
+
+def generar_pin():
+    return str(random.randint(100000, 999999))
+
+def manejar_cliente(conn, addr):
+    try:
+        print(f"[🔗] Conexión entrante desde {addr}")
+        conn.sendall("PIN: ".encode())
+        pin_cliente = conn.recv(1024).decode().strip()
+
+        if pin_cliente == pin_actual:
+            print("[✅] PIN correcto. Usuario conectado.")
+            conn.sendall("Conectado al chat seguro.\n".encode())
+
+            # Iniciar chat
+            def recibir():
+                while True:
+                    data = conn.recv(1024).decode()
+                    if not data:
+                        break
+                    print(f"[Amigo]: {data}")
+
+            threading.Thread(target=recibir, daemon=True).start()
+
+            while True:
+                msg = input()
+                conn.sendall(msg.encode())
+
+        else:
+            print("[❌] PIN incorrecto. Cerrando conexión.")
+            conn.sendall("PIN incorrecto.\n".encode())
+            conn.close()
+
+    except:
+        conn.close()
+
+# ciclo principal
+while True:
+    pin_actual = generar_pin()
+    print(f"\n[🔐] Nuevo PIN generado: {pin_actual}")
+    print("[⏳] Esperando conexión por 15 segundos...")
+
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    server.bind((HOST, PORT))
+    server.listen(1)
+    server.settimeout(15)
+
+    try:
+        conn, addr = server.accept()
+        manejar_cliente(conn, addr)
+    except socket.timeout:
+        print("[⏰] Nadie se conectó. Generando nuevo PIN...")
+    finally:
+        server.close()
